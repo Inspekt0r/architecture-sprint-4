@@ -1,0 +1,43 @@
+@startuml
+
+actor ShopAPI
+actor CRMAPI
+actor MESAPI
+actor InternetShop
+actor ClientBrowser
+
+participant Cache
+participant S3Storage
+
+== Write-Through Caching ==
+ShopAPI -> Cache: Upload file
+Cache -> ShopAPI: File accepted
+Cache -> S3Storage: Asynchronously save file
+
+CRMAPI -> Cache: Upload file
+Cache -> CRMAPI: File accepted
+Cache -> S3Storage: Asynchronously save file
+
+== Read with Expiration ==
+MESAPI -> Cache: Request file
+alt File in cache and not expired
+    Cache -> MESAPI: Return cached file
+else File expired or not in cache
+    Cache -> S3Storage: Fetch file from S3
+    S3Storage -> Cache: Return file
+    Cache -> MESAPI: Cache and return file
+end
+
+== Client-Side Caching ==
+InternetShop -> ClientBrowser: Load catalog (cached?)
+alt Cached data is valid
+    ClientBrowser -> InternetShop: Use local cache
+    ClientBrowser -> ClientBrowser: Cache data
+else Cache expired or not present
+    ClientBrowser -> InternetShop: Fetch catalog data
+    InternetShop -> ShopAPI: Fetch catalog data
+    ShopAPI -> InternetShop: Return data
+    InternetShop -> ClientBrowser: Return data
+end
+
+@enduml
